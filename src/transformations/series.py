@@ -10,7 +10,7 @@ TIMESERIES_COLS = ["timeframe", 'espresso_flow',
                    'espresso_temperature_basket']
 
 
-def timeseries_to_df(values: Dict[pd.Series], timeframe):
+def timeseries_to_df(values: Dict[str, pd.Series], timeframe):
     """
 
     Args:
@@ -39,18 +39,26 @@ def timeseries_to_df(values: Dict[pd.Series], timeframe):
         return None
 
 
-def to_shot_series(shots_df: pd.DataFrame):
-    shot_series = shots_df.filter(TIMESERIES_COLS, axis=1).apply(
+def extract_shot_series(shots_df: pd.DataFrame):
+    """
+
+    Args:
+        shots_df (DataFrame): A dataframe that contains an np.array for each field in `TIMESERIES_COLS`
+
+    Returns:
+        shots_series (DataFrame)
+    """
+    shots_series = shots_df.filter(TIMESERIES_COLS, axis=1).apply(
         lambda row: timeseries_to_df(row[1:].to_dict(), timeframe=row.timeframe),
         axis=1)
 
-    shot_series = pd.concat(shot_series.to_dict(), names=["id"])
+    shots_series = pd.concat(shots_series.to_dict(), names=["id"])
 
-    return shot_series
+    return shots_series
 
 
 def resample_shot_series(shots_series: pd.DataFrame, freq='500L'):
-    groupby = shots_series.groupby(['id', pd.Grouper(key='seconds', freq=freq)])
+    groupby = shots_series.reset_index().groupby(['id', pd.Grouper(key='seconds', freq=freq)])
     resampled = groupby[TIMESERIES_COLS[1:]].mean()
     
     return resampled
