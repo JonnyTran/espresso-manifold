@@ -10,7 +10,7 @@ TIMESERIES_COLS = ["timeframe", 'espresso_flow',
                    'espresso_temperature_basket']
 
 
-def timeseries_to_df(values: Dict[str, pd.Series], timeframe):
+def timeseries_to_df_(values: Dict[str, pd.Series], timeframe):
     """
 
     Args:
@@ -49,7 +49,7 @@ def extract_shot_series(shots_df: pd.DataFrame):
         shots_series (DataFrame)
     """
     shots_series = shots_df.filter(TIMESERIES_COLS, axis=1).apply(
-        lambda row: timeseries_to_df(row[1:].to_dict(), timeframe=row.timeframe),
+        lambda row: timeseries_to_df_(row[1:].to_dict(), timeframe=row.timeframe),
         axis=1)
 
     shots_series = pd.concat(shots_series.to_dict(), names=["id"])
