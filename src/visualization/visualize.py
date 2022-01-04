@@ -2,25 +2,28 @@ import pandas as pd
 import plotly.graph_objs as go
 
 
-def visualize_shot(series, time_index=None,
-                   flow_quantiles=None, weight_quantiles=None, pressure_quantiles=None, title=None):
-    series[series < 0] = None
+def visualize_shot(shot, time_index=None,
+                   flow_quantiles=None, weight_quantiles=None, pressure_quantiles=None, title=None,
+                   weight_col='espresso_flow_weight', resistance_col="espresso_resistance",
+                   pressure_col="espresso_pressure", flow_col="espresso_flow"):
+    if isinstance(shot.index, pd.MultiIndex):
+        shot.index = shot.index.get_level_values(-1)
 
-    if time_index is None and isinstance(series.index, pd.TimedeltaIndex):
-        time_index = series.index / pd.Timedelta(1, "s")
+    shot.replace({-1: None}, inplace=True)
+
+    if time_index is None and isinstance(shot.index, pd.TimedeltaIndex):
+        time_index = shot.index / pd.Timedelta(1, "s")
     else:
-        time_index = series.index
-
-    if "espresso_resistance" not in series:
-        series["espresso_resistance"] = series["espresso_pressure"] / series["espresso_flow"]
+        time_index = shot.index
 
     fig = go.Figure()
 
+    # Flow
     if isinstance(flow_quantiles, (tuple, list)):
         upper = flow_quantiles[1]
         lower = flow_quantiles[0][::-1]
-        fig.add_scatter(x=time_index.tolist()+time_index[::-1].tolist(),
-                        y=upper.tolist()+ lower.tolist(), mode='lines',
+        fig.add_scatter(x=time_index.tolist() + time_index[::-1].tolist(),
+                        y=upper.tolist() + lower.tolist(), mode='lines',
                         opacity=0.3,
                         fill='toself',
                         hoverinfo='none',
@@ -28,10 +31,11 @@ def visualize_shot(series, time_index=None,
                         line_color='rgba(255,255,255,0)',
                         name="flow_quantiles")
 
-    if "espresso_flow" in series:
-        fig.add_scatter(x=time_index, y=series['espresso_flow'], mode='lines', name="espresso_flow",
-                    line={"color": "lightblue"})
+    if flow_col in shot:
+        fig.add_scatter(x=time_index, y=shot[flow_col], mode='lines', name=flow_col,
+                        line={"color": "lightblue"})
 
+    # Flow
     if isinstance(weight_quantiles, (tuple, list)):
         upper = weight_quantiles[1]
         lower = weight_quantiles[0][::-1]
@@ -43,20 +47,21 @@ def visualize_shot(series, time_index=None,
                         fillcolor='brown',
                         line_color='rgba(255,255,255,0)',
                         name="weight_quantiles")
-    if "espresso_flow_weight" in series:
-        fig.add_scatter(x=time_index, y=series['espresso_flow_weight'], mode='lines', name="espresso_flow_weight",
-                    line={"color": "brown"})
+    if weight_col in shot:
+        fig.add_scatter(x=time_index, y=shot[weight_col], mode='lines', name=weight_col,
+                        line={"color": "brown"})
 
-    fig.add_scatter(x=time_index, y=series['espresso_flow_goal'], mode='lines', name="espresso_flow_goal",
+    fig.add_scatter(x=time_index, y=shot['espresso_flow_goal'], mode='lines', name="espresso_flow_goal",
                     line={"color": "blue", "dash": "dash"})
 
-
-
-    if "espresso_resistance" in series:
-        fig.add_scatter(x=time_index, y=series['espresso_resistance'], mode='lines', name="espresso_resistance",
+    # Resistance
+    # if "espresso_resistance" not in shot:
+    #     shot["espresso_resistance"] = shot["espresso_pressure"] / shot["espresso_flow"]
+    if resistance_col in shot:
+        fig.add_scatter(x=time_index, y=shot[resistance_col], mode='lines', name=resistance_col,
                         line={"color": "yellow"})
 
-
+    # Pressure
     if isinstance(pressure_quantiles, (tuple, list)):
         upper = pressure_quantiles[1]
         lower = pressure_quantiles[0][::-1]
@@ -68,13 +73,22 @@ def visualize_shot(series, time_index=None,
                         hoverinfo='none',
                         line_color='rgba(255,255,255,0)',
                         name="pressure_quantiles")
-    if "espresso_pressure" in series:
-        fig.add_scatter(x=time_index, y=series['espresso_pressure'], mode='lines', name="espresso_pressure",
+    if pressure_col in shot:
+        fig.add_scatter(x=time_index, y=shot[pressure_col], mode='lines', name=pressure_col,
                         line={"color": "lightgreen"})
-    fig.add_scatter(x=time_index, y=series['espresso_pressure_goal'], mode='lines', name="espresso_pressure_goal",
+
+    fig.add_scatter(x=time_index, y=shot['espresso_pressure_goal'], mode='lines', name="espresso_pressure_goal",
                     line={"color": "green", "dash": "dash"})
 
+    # State change
+    if 'espresso_state_change' in shot:
+        for i, val in zip(time_index, shot["espresso_state_change"]):
+            if val is None: continue
+            if val == 0.0 or val == "0.0":
+                fig.add_vline(x=i, line_width=1, line_dash="dash", line_color="black", name='espresso_state_change')
+            # else:sadd_vline(x=i, line_width=1, line_dash="dash", line_color="orange", name='espresso_state_change')
+
     fig.update_layout(title=title, hovermode="x", plot_bgcolor="darkgray")
-    fig.update_xaxes(title_text='seconds')
-    fig.update_yaxes(range=[0, 10])
+    fig.update_xaxes(title_text='seconds', showgrid=False)
+    fig.update_yaxes(range=[0, 10], showgrid=True)
     return fig

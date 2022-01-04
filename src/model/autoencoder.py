@@ -4,14 +4,15 @@ from pytorch_lightning import LightningModule
 from tsa import TimeSeriesDataset
 from tsa.model import AutoEncForecast
 
-from src.transformations import extract_shot_series, resample_shot_series
-
 
 class ShotsAutoEncForecast(AutoEncForecast, LightningModule):
-    def __init__(self, dataset, config):
+    def __init__(self, dataset: TimeSeriesDataset, config):
         self.dataset = dataset
 
         input_size = len(self.dataset.feature_cols)
+        config["output_size"] = len(dataset.target_col)
+        config["label_col"] = dataset.target_col
+
         super().__init__(config, input_size)
 
         self.criterion = torch.nn.MSELoss()

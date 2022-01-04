@@ -1,5 +1,7 @@
-import pandas as pd
 from typing import Dict
+
+import numpy as np
+import pandas as pd
 
 TIMESERIES_COLS = ["timeframe", 'espresso_flow',
                    'espresso_weight', 'espresso_pressure', 'espresso_flow_goal',
@@ -8,6 +10,28 @@ TIMESERIES_COLS = ["timeframe", 'espresso_flow',
                    'espresso_temperature_mix', 'espresso_water_dispensed',
                    'espresso_temperature_goal', 'espresso_resistance_weight',
                    'espresso_temperature_basket']
+
+
+def least_common(series: pd.Series):
+    return series.value_counts().tail(1).index[0]
+
+
+AGGREGATIONS = {
+    "espresso_flow": np.mean,
+    'espresso_weight': np.mean,
+    'espresso_pressure': np.mean,
+    'espresso_flow_goal': np.mean,
+    'espresso_resistance': np.mean,
+    'espresso_flow_weight': np.mean,
+    'espresso_state_change': "first",
+    'espresso_pressure_goal': np.mean,
+    'espresso_flow_weight_raw': np.mean,
+    'espresso_temperature_mix': np.mean,
+    'espresso_water_dispensed': np.mean,
+    'espresso_temperature_goal': np.mean,
+    'espresso_resistance_weight': np.mean,
+    'espresso_temperature_basket': np.mean,
+}
 
 
 def timeseries_to_df_(values: Dict[str, pd.Series], timeframe):
@@ -39,7 +63,7 @@ def timeseries_to_df_(values: Dict[str, pd.Series], timeframe):
         return None
 
 
-def extract_shot_series(shots_df: pd.DataFrame):
+def extract_shot_series(shots_df: pd.DataFrame, smooth=[]):
     """
 
     Args:
@@ -51,14 +75,29 @@ def extract_shot_series(shots_df: pd.DataFrame):
     shots_series = shots_df.filter(TIMESERIES_COLS, axis=1).apply(
         lambda row: timeseries_to_df_(row[1:].to_dict(), timeframe=row.timeframe),
         axis=1)
-
     shots_series = pd.concat(shots_series.to_dict(), names=["id"])
+
+    shots_series = preprocess_shot_series(shots_series)
 
     return shots_series
 
 
-def resample_shot_series(shots_series: pd.DataFrame, freq='500L'):
+def preprocess_shot_series(shots_series: pd.DataFrame):
+    shots_series["espresso_state_change"] = shots_series["espresso_state_change"].astype(str).astype("category")
+    shots_series["espresso_state_change"].fillna(shots_series["espresso_state_change"].mode(dropna=True), inplace=True)
+
+    shots_series['espresso_resistance'][shots_series['espresso_resistance'] > 100] = np.NaN
+
+    return shots_series
+
+
+def resample(shots_series: pd.DataFrame, freq='500L', agg_func=None):
     groupby = shots_series.reset_index().groupby(['id', pd.Grouper(key='seconds', freq=freq)])
-    resampled = groupby[TIMESERIES_COLS[1:]].mean()
-    
+
+    agg_funcs = {col: func for col, func in AGGREGATIONS.items() if col in shots_series.columns}
+    if agg_func:
+        agg_funcs.update(agg_func)
+
+    resampled = groupby[TIMESERIES_COLS[1:]].agg(agg_funcs)
+
     return resampled
