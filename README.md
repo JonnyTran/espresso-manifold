@@ -1,7 +1,7 @@
 DE1shots_mapping
 ==============================
 
-Using Visu
+Using espresso data from thousands of public shots on Visualizer.Coffee to extract and understand characteristics of flow/pressure/temperature profiles. 
 
 Project Organization
 ------------
